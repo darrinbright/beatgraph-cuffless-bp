@@ -1,0 +1,438 @@
+\documentclass[journal,twoside,web]{ieeecolor}
+\usepackage{jsen}
+\usepackage{graphicx}
+\usepackage{eso-pic}
+\usepackage{tabularx,booktabs}
+\newcolumntype{C}{>{\centering\arraybackslash}X} 
+\usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\newcommand{\algorithmicbreak}{\textbf{break}}
+\newcommand{\BREAK}{\STATE \algorithmicbreak}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\graphicspath{{Jscan_FIGURES/}}
+\graphicspath{{jDoc_images/}}
+\usepackage{caption}
+\usepackage{textcomp}
+\usepackage{wrapfig}
+\usepackage{amsmath,adjustbox,mathtools}
+\usepackage{comment}
+\usepackage{threeparttable}
+\usepackage{adjustbox}
+\usepackage{makecell}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{acronym}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+% \markboth{\journalname, VOL. XX, NO. XX, XXXX 2024}
+% {Abhinay \MakeLowercase{\textit{et al.}}: SmartBP: Smartphone Based Blood Pressure
+% Measurement System Using Mixed Attention Gated U-Net (July 2024)}
+\definecolor{abstractbg}{rgb}{0.89804,0.94510,0.83137}
+\setlength{\fboxrule}{0pt}
+\setlength{\fboxsep}{0pt}
+
+\begin{document}
+\title{Smartphone Based Blood Pressure Measurement Using a Mixed Attention Gated U-Net}
+\author{
+\IEEEauthorblockN{
+Abhinay Bhandekar, Thakur Jaideep Singh and Debanjan Das \IEEEmembership{Senior Member, IEEE}
+}
+\thanks{
+Abhinay Bhandekar is with the Department of Computer Science Engineering, IIIT Naya Raipur, Email: bhandekar22100@iiitnr.edu.in. 
+}
+\thanks{
+Thakur Jaideep Singh is with the Department of Data Science and Artificial Intelligence, IIIT Naya Raipur, Email: thakur22102@iiitnr.edu.in. 
+}
+\thanks{
+Debanjan Das is with the Department of  Centre of Excellence in Affordable Healthcare, IIT Kharagpur, Email: debanjan@ieee.org 
+}
+}
+
+\IEEEtitleabstractindextext{%
+\fcolorbox{abstractbg}{abstractbg}{%
+\begin{minipage}{\textwidth}%
+\begin{wrapfigure}[12]{r}{3.8in}%
+\includegraphics[width=3.6in]{images ppt/overview.PNG}%
+\label{ov}
+\end{wrapfigure}%
+\begin{abstract}					
+%oldJaundice occurs due to excess deposition of bilirubin in the blood causing the yellow colouring of eyes and skin. The proposed paper presents jScan which is a novel Non-Invasive Autonomous Bilirubin Estimation technique to address the shortcomings of hyperbilirubinemia and Jaundice prediction. The model captures the eye image and autonomously extracts the sclera as the region of interest using the smartphone camera. The Adaptive KMeans algorithm is used to find the dominant colour by analyzing color spectroscopy of the extracted portions and predicts the bilirubin level in the blood. A value greater than 3 mg/dl is classified as hyperbilirubinemic. The model predicts the bilirubin level to an accuracy of 95.5\% with bias 0.43 mg/dL and sensitivity of 92.85\% for 102 participants.
+ Accurate, convenient blood pressure (BP) monitoring is essential for early detection and management of hypertension. This paper presents a smartphone-based BP measurement system using fingertip photoplethysmogram (PPG) signals, captured through a smartphone camera, as a non-invasive alternative to traditional cuff-based methods. The system was trained and evaluated using a subset of the MIMIC-III database, comprising over 860,000 records with high-quality PPG and arterial blood pressure (ABP) signals. After rigorous preprocessing, including signal normalization and region of interest (ROI) selection, the Mixed Attention Gated U-Net (MAGU) architecture was employed to extract meaningful features from the PPG data. The proposed model achieves a mean absolute error (MAE) of 2.96 mmHg for systolic BP (SBP) and 1.90 mmHg for diastolic BP (DBP), meeting the Association for the Advancement of Medical Instrumentation (AAMI) standards for BP measurement accuracy. Model performance was optimized for mobile devices, reducing the size to 14 MB, enabling real-time inference on smartphone platforms. This method provides a feasible, accessible approach for continuous BP monitoring, leveraging smartphone capabilities to offer clinically comparable BP measurements without additional equipment, promoting accessible healthcare and early hypertension management.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Blood pressure, PPG, DeepLearning, Edge-based approach, Cuffless blood pressure estimation, region of interest.
+\end{IEEEkeywords}
+\end{minipage}}}
+
+
+\maketitle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Introduction}\label{introduction}
+%this paragraph includes introduction and consequences of Jaundice:
+%old Jaundice is the yellowish pigmentation of the skin and whites of the eyes due to high bilirubin levels. In adults it is typically a sign indicating the presence of underlying diseases involving abnormal heme metabolism, liver dysfunction, or biliary obstruction. The most commonly associated symptoms of Jaundice are itchiness, yellowish colouration, and dark urine. The values of billirubin in blood are normally below $1$ mg/dl, which increases to over $3$ mg/dl during Jaundice. It causes an estimated 114k deaths and 178k cases of disability per year \cite{article11}. Due to Jaundice being a major public health issue, it's early detection is of critical importance. 
+BP is a critical indicator for many diseases, commonly measured using oscillometric and auscultatory cuff-based methods. These intermittent techniques are widely employed in both clinical and home settings. However, their suitability for long-term monitoring is questionable due to potential skin irritations and patient discomfort \cite{b1}. BP measurements, which include systolic and diastolic pressures expressed in mmHg, are essential for the early detection of various medical conditions, including cardiovascular diseases. Hypotension (low blood pressure) can signal significant underlying health issues, while hypertension (high blood pressure) is a major risk factor for conditions such as heart attacks and strokes \cite{b2}. 
+                                                                                                                               
+\paragraph*{\textbf{Motivation}}
+Existing blood pressure monitoring methods are classified into invasive and non-invasive categories. Invasive methods, despite their high accuracy, pose significant risks of infection and morbidity. Non-invasive methods, typically employing oscillometry with inflatable cuffs, can cause discomfort and restrict patient mobility. The need for reliable, non-invasive BP measurement is crucial, with industry standards such as those from the Association for the Advancement of Medical Instrumentation (AAMI) recommending a mean absolute difference (MAD) of not more than 5 mmHg compared to reference methods. One promising non-invasive and cost-effective technique is PPG, which captures cardiovascular parameters, including BP, through changes in light absorption \cite{b5}. Advancements in data-driven methods, powered by technologies like the Internet of Things (IoT), Artificial Intelligence (AI), Machine Learning (ML), and Deep Learning (DL), have revolutionized BP monitoring \cite{b8}. Modern smartphones, equipped with high-resolution cameras, powerful CPUs, and light-emitting diode (LED) flashes, can illuminate the tissue, bones, and blood vessels in the finger \cite{b11}. The reflected light from these structures is captured by the camera, allowing the extraction of PPG signals. These signals can be used to detect various vital indicators such as BP, hemoglobin levels, and glucose levels \cite{b20}\cite{b26}.
+
+Building on these technological advancements, our approach focuses solely on leveraging PPG signals for BP monitoring, avoiding the need for multiple sensors and complex techniques like Pulse Wave Velocity (PWV), Pulse Transit Time (PTT), or Pulse Arrival Time (PAT) \cite{b9} \cite{b27}. This simplification enhances practicality and ensures a more straightforward and efficient method for non-invasive BP estimation, making it accessible and user-friendly. With this motivation, we introduce a hybrid deep learning-based solution, referred to as SmartBP. SmartBP is designed to automatically extract valuable features from smartphone-derived PPG signals for accurate and swift BP estimation.
+
+Utilizing the conceptual framework illustrated in Fig. 1, initial signal processing techniques are applied to optimize features from raw PPG data, significantly reducing data complexity and enhancing computational efficiency. This streamlined approach not only simplifies the process but also ensures reliable and user-friendly BP monitoring, addressing the limitations of current methods and paving the way for improved health monitoring solutions.
+
+In this paper, we propose SmartBP, an autonomous smartphone-based framework, to measure blood pressure by taking video of fingertip on turning flash. The SmartBP will work as a edge-based noninvasive device, especially in working professionals, with simple usage and cost-effectiveness. The predictions of the model are verified by bp-02 Automatic Blood Pressure Monitor machine.
+
+%The contributions of this paper are as follows:
+The following is a summary of the contribution discussed in this paper:
+\begin{itemize} \item\textbf{Autonomous \& non-invasive: }We offer a method intended to optimize computing operations through effective feature extraction from unprocessed PPG data. The adoption of a mixed-attention gated U-Net model is the main innovation.
+
+    \item \textbf{Edge-based methodology:}The suggested algorithm is able to determine blood pressure from a video of a fingertip that was captured with a smartphone when the flash was focused right on the edge.
+    
+    \item \textbf{Accurate and Dependable: }The findings validate the accuracy of the model across a range of demographic groups, with an average MAE of 2.96 mmHg for SBP and 1.9 mmHg for DBP.
+    
+    \item \textbf{Platform independent: }We have created an intuitive application that makes it easier to check blood pressure at any time. iOS and Android devices can both utilize this software.
+\end{itemize}
+
+The paper is structured into sections, with Section \ref{related_works} focusing on previous research. In Section \ref{methodology}, the methodology of SmartBP is expounded upon, while Section \ref{result} presents experimental studies and compares the results and accuracy with existing systems. Lastly, Section \ref{conclusion} examines the conclusion and outlines future endeavors.
+
+
+\section{Related Works}\label{related_works}
+
+
+%MAE = Mean Absolute Error, MSE = Mean Square Error, RMSE = Root Mean Square Error
+
+The conventional approaches for cuffless-blood pressure prediction, namely machine-learning and deep-learning models, have their unique challenges. Machine-learning models necessitate manual feature extraction from PPG waveforms, resulting in cumbersome processes. Although some earlier studies achieved promising results, they often lack scalability and practicality, as they were conducted under highly controlled conditions with limited data. Deep learning, on the other hand, presents an emerging avenue. It excels in modeling high-dimensional, complex, and nonlinear systems, offering significant potential for blood pressure prediction. 
+\subsection{Previous Similar Work}
+The document \cite{b15} presents the Dual Encoding U-Net (DEU-Net) methodology for continuous blood pressure estimation from PPG signals. It involves preprocessing for noise removal, DEU-Net architecture with skip connections, a feature fusion block for multi-scale features, and an attention mechanism for improved representation. limitations include dataset quality, computational complexity, and the absence of external validation against other models. In \cite{b12} authors partitioned the dataset based on demographics and physiology and developed separate models for each partition. The Lasso Regression algorithm was used for blood pressure estimation. The results showed that the demographically and physiologically partitioned models performed better than the ubiquitous models, with MAE of 5 mmHg for DBP and 6.9 mmHg for SBP but they used only data from Samsung Galaxy S6 smartphones with a dedicated PPG sensor. This limits the generalizability of the results to other smartphone models or wearables without a dedicated PPG sensor. In their study, \cite{b3} utilized temporal and frequency features of PPG and its derivatives. Despite their efforts, they achieved a MAE of 9.43 for SBP and 6.88 for DBP. The authors of \cite{b4} could not present the real time results of the proposed model.
+
+In 2003, Teng et al. \cite{b23} conducted a study involving the collection of PPG data from 15 young individuals to explore the relationship between PPG waveform features and arterial blood pressure (ABP). They utilized a linear regression approach to predict these features, resulting in a mean error (ME) ± standard deviation (STD) between the ground truth and estimated BP readings, which are 0.02 ± 4.39 mmHg for DBP and 0.21 ± 7.32 mmHg for SBP. However, this study had limitations, including a small dataset and controlled environmental conditions, raising questions about its applicability in practical settings. Hasanzadeh et al. A different approach was taken by \cite{b24}, who extracted 19 features, mostly focusing on morphological traits, from each PPG signal. Regression models were trained using these characteristics and matching SBP and DBP values. According to British Hypertension Society (BHS) guidelines, the method produced anticipated standard deviations of 10.38 mmHg for systolic blood pressure and 4.17 mmHg for diastolic blood pressure, which were classified as Grade A and Grade C, respectively. A feature selection technique was utilized by Slapnicar \cite{b26} in order to determine which morphological traits were most pertinent for BP prediction. It's interesting to note that the study found a lot of aspects to be unimportant, indicating that perhaps not all of the PPG signal information's potential was used. The proposed model \cite{b6} utilizes CNNs to extract spectro-temporal features from PPG signals for accurate blood pressure estimation. However, limitations include the need for extensive preprocessing to remove artifacts and the challenge of achieving satisfactory accuracy without patient-specific calibration. The proposed model in \cite{b7} utilizes a multilayer feed-forward backpropagation Artificial Neural Network (ANN) with optimized architecture {35, 20} to estimate continuous blood pressure from PPG signals. However, individual variations in arterial properties and the need for extensive training data pose limitations to the model's universality and applicability across diverse patient populations. Authors of \cite{b16} proposed a model which extracts 32 physiological features from preprocessed PPG signals, which are then standardized using Z-score normalization. These features are selected as the input set for the deep neural network predictor, but they did not test the model by integrating it in a smartphone. The summary of the comparative analysis of \textit{SmartBP} with prior works is represented in Table \ref{tab: rel-work}.
+\begin{table}[h]
+    \centering
+    \caption{Summary of the existing solutions}
+    \label{tab: rel-work}
+    \begin{tabular}{p{0.5cm}|p{1.0cm}|p{1.3cm}|p{0.6cm}|p{0.4cm}|p{0.9cm}|p{1.1cm}}
+        \toprule
+        \centering
+         \centering \textbf{Paper} & \centering \textbf{Method} & \centering \textbf{Dataset} & \textbf{Signal} & \textbf{ROI} & \textbf{Mobile (App)} & \textbf{Processing Speed}\tabularnewline
+         \hline
+         
+         %Line 1
+         \centering \cite{b1} & \centering Alexnet\\Slapnicar\\resnet & \centering MIMIC-III & \centering rPPG (face) & \centering $\textcolor{green}{\checkmark}$ & \centering $\textcolor{red}{\times}$  & \centering Medium \tabularnewline
+         \hline
+         
+         %Line 2
+         \centering \cite{b2} & \centering LSTM & \centering MIMIC-II & \centering PPG\\ECG & \centering $\textcolor{red}{\times}$ & \centering $\textcolor{red}{\times}$ & \centering Low \tabularnewline
+         \hline
+         
+         %Line 3
+         \centering \cite{b5} & \centering CNN\\alexnet & \centering MIMIC-II & \centering PPG & \centering $\textcolor{red}{\times}$ & \centering $\textcolor{red}{\times}$ & \centering Medium \tabularnewline
+         \hline
+         
+         %Line 4
+         \centering \cite{b13} & \centering supervised U-Net model & \centering MIMIC-III & \centering PPG & \centering $\textcolor{red}{\times}$ & \centering $\textcolor{red}{\times}$ & \centering High \tabularnewline
+         \hline
+
+         %Line 5
+         \centering \cite{b10} & \centering GAN, LR & \centering Collected from 30 volunteers & \centering PPG \\ECG & \centering $\textcolor{green}{\checkmark}$ & \centering $\textcolor{green}{\checkmark}$ & \centering Low \tabularnewline
+         \hline
+        
+         %Line 6
+         \centering \cite{b30} & \centering U-Net & \centering MIMIC-II & \centering ECG & \centering $\textcolor{red}{\times}$ & \centering $\textcolor{red}{\times}$ & \centering Medium \tabularnewline
+         \hline
+         
+         %Line 7
+    \end{tabular}
+    \\
+    \vspace{10pt}
+    \\ \textbf{ROI:} Region of Interest
+\end{table}
+
+\section{Methodology}\label{methodology}
+%brief introduction
+In this section, using a portion of the MIMIC-III database \cite{b45} to acquire and preprocess data, ROI (Region of interest), Utilizing SmartBP, a hybrid deep learning-based system, to automatically extract features from PPG signals generated by smartphones, In order to show the model's durability and tolerance to changes in temperature and charge-discharge patterns, extensive testing on a variety of population, The benefits and contributions of the suggested SmartBP model to the area of blood pressure prediction utilizing PPG signals are examined through a comparison with earlier research are covered.
+\begin{figure}[!htp]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/Presentation1.pdf}
+\caption{Conceptual view of proposed system}
+\label{Conceptual view of Proposed System}
+\end{figure}
+\subsection{Dataset and Preprocessing}
+\subsubsection{MIMIC-III}
+ We utilized a subset of the MIMIC-III database, which spans from 2001 to 2008 and is sampled at 125 Hz. This subset, available on Kaggle, comprises 8,62,492 records encompassing PPG, and ABP signals. The dataset underwent rigorous preprocessing to ensure data cleanliness and validity. For our analysis, we focused on signal episodes lasting 7 seconds. Even though it only makes up a small portion of the entire MIMIC-III database, it is nonetheless compact and has respectable signal quality. Nevertheless, it is inappropriate for assessing model performance since it lacks subject association. As such, we only used this dataset in the first part of our research to evaluate input signal parameterization.
+
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/distribution.pdf}
+%\captionsetup{justification=centering}
+\caption{Distribution of SBP and DBP samples}
+\label{fig:data_distribution}
+\end{figure}
+To avoid smaller features being overshadowed by larger ones, data normalization is essential. We applied the minimum and maximum normalization techniques, which constrain all values within the range of [-2 to 2],
+
+\begin{equation}
+\label{min-max}
+    X_{\text{normalized}} = \frac{X - \min(X)}{\max(X) - \min(X)},
+\end{equation}
+where, this formula normalizes the variable \(X\) to fall within the [-2, 2] range.
+\subsection{Region of Interest and Video usability criteria}
+In typical smartphone configurations, the flashlight is often positioned asymmetrically, leading to uneven brightness across the captured frames. This asymmetry can introduce inconsistencies in the PPG signals and subsequently impact the accuracy of blood pressure measurements. To address this challenge, we propose a method to define the ROI by focusing on the center portion of each frame, where the impact of uneven lighting is minimized. The ROI is determined using the following formulae \ref{ROI1}, \ref{ROI2},
+
+\begin{equation}
+\label{ROI1}
+\text{offset}_{X} = \left( \frac{\text{MaxFrameWidth}}{2} \right) - \left( \frac{\text{RoiWidth}}{2} \right),
+\end{equation}
+
+
+\begin{equation}
+\label{ROI2}
+\text{offset}_{Y} = \left( \frac{\text{MaxFrameHeight}}{2} \right) - \left( \frac{\text{RoiHeight}}{2} \right).
+\end{equation}
+
+
+Here, MaxFrameWidth and MaxFrameHeight represent the dimensions of the captured frame, while RoiWidth and RoiHeight denote the desired dimensions of the Region of Interest. The calculated offsets, \(\text{offset}_{X}\) and \(\text{offset}_{Y}\), ensure that the ROI is positioned at the center of the frame, mitigating the impact of varying flashlight intensity across different smartphone models.
+\begin{figure}[!htp]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/roi.pdf}
+\caption{Extracting PPG from Region of Interest}
+\label{Conceptual view of Proposed System}
+\end{figure}
+The video recording quality in smartphone-based blood pressure measurement relies on fingertip position, pressure, and lighting conditions. To assess usability, a scheme monitors color channel saturation. Chromatic parameters, such as average values (Ave) of red (R), green (G), and blue (B) channels, along with the standard deviation of the red channel (σR), are evaluated frame by frame using the below criteria in Table 2 which was proposed by \cite{b20} to ensure robust performance under varying conditions.
+\begin{table}[h]
+\label{criteria}
+    \centering
+    \caption{Conditions for Evaluating Video Usability}
+    \begin{tabular}{|c|c|}
+        \hline
+        \textbf{Condition} & \textbf{Threshold} \\
+        \hline
+        Ave(R) & $\geq 240$ \\
+        \hline
+        $\sigma R$ & $\leq 20$ \\
+        \hline
+        Ave(G) & $< 1$ \\
+        \hline
+        Ave(B) & $< 75$ \\
+        \hline
+    \end{tabular}
+\end{table}
+\subsection{PPG signal extraction}
+Extracting PPG signals from camera videos is a key component of our SmartBP project. The video processing begins by capturing frames from the video source, with a specific focus on a 7-second duration. From these frames, we extract PPG signals using the red channel, which is later preprocessed for signal quality improvement. To enhance signal accuracy, we apply a Butterworth filter with specified parameters as given in the below formula \ref{butter},
+\begin{equation}
+\label{butter}
+H(s) = \frac{1}{{1 + \left(\frac{s}{{j \cdot \omega_c}}\right)^{2n}}}
+\end{equation}
+
+In the above equation, \( s \) is the complex frequency variable represented in italics, \( j \) denotes the imaginary unit, and \( n \) corresponds to the filter order. The variable \( \omega_c \) represents the cutoff frequency. The transfer function of the filter, denoted by \( H(s) \), is defined by the expression on the right-hand side. It characterizes the behavior of the Butterworth filter, showcasing its roll-off characteristics as determined by the filter order and cutoff frequency.
+The algorithm 1 outlines the process of extracting PPG signal from a video file (.mp4). It assumes a frame rate of 30 frames per second (fps) and calculates the Nyquist frequency as half of the frame rate. The algorithm iterates through the frames of the video up to frame 876. Within each iteration, it enters a while loop that continues indefinitely. In each loop iteration, a frame of the video is selected and stored. Then, a bandpass Butterworth filter is designed with a 4th order, using the specified lower and higher cutoff frequencies. This filter is applied to the PPG signal to extract the desired frequency components. The 'filtfilt' function is used to perform zero-phase digital filtering to avoid phase distortion. Finally, the loop index is incremented by the frame size, and the process repeats until all frames are processed.
+\\
+\begin{table}[h]
+\begin{center}
+\label{algo1}
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{0.5\textwidth} { l }
+\hline
+ \textbf{Algorithm 1: PPG Singal Extraction from video} \\ 
+  \hline
+ \textbf{Input}: Video File (.mp4)\-\hspace{1cm} \\
+   \-\hspace{0.1cm} frame\_per\_sec(fps) = 30 \\
+   \-\hspace{0.1cm} nyquist = 0.5 * fps \\   
+\textbf{for} (i=0 ; i $< 875) \\
+
+ \-\hspace{0.1cm}\vline \-\hspace{0.1cm}\textbf{while} TRUE \textbf{do} \\
+  
+  \-\hspace{0.1cm}\vline \-\hspace{0.1cm}\-\hspace{0.1cm}\vline \-\hspace{0.1cm} frame ←video[i:i+frame\_size]  \\    
+ 
+  \-\hspace{0.1cm}\vline \-\hspace{0.1cm}\-\hspace{0.1cm}\vline \-\hspace{0.1cm} frame $\leftarrow$ video[$i:i+$frame\_size$ \\  
+ 
+  \-\hspace{0.1cm}\vline \-\hspace{0.1cm}\-\hspace{0.1cm}\vline \-\hspace{0.1cm} $b, a \leftarrow$ butter(4, [$low, high$], $btype='band'$ \\
+  
+  
+  
+  \-\hspace{0.1cm}\vline \-\hspace{0.1cm}\-\hspace{0.1cm}\vline \-\hspace{0.1cm}  filtered\_ppg $\leftarrow$ filtfilt($b, a, ppg) \\
+  
+  \-\hspace{0.1cm}\vline \-\hspace{0.1cm} \textbf{end} \\ 
+\-\hspace{0.1cm}\vline \-\hspace{0.1cm} i+ = frame\\ 
+
+\textbf{end} \\
+\hline
+\end{tabularx}
+\end{center}
+\end{table}
+
+
+\linebreak
+The filter's lower cutoff frequency (lowcut) is set to 0.4 Hz, and the upper cutoff frequency (highcut) to 4.0 Hz. Furthermore, we address signal resampling to ensure uniformity, with a target length of 875 samples. The signal processing pipeline culminates in the detection of PPG cycles. We utilize peak detection in the filtered PPG signal, with criteria such as height and distance considered. Key parameters involved in this process include the Nyquist frequency, frame rate (fps), and the initial PPG signal. These parameters collectively contribute to accurate PPG signal extraction and form the foundation of our SmartBP's data processing workflow for blood pressure prediction.
+Raw PPG signals contain noise and artifacts, making them unreliable for analysis. After preprocessing with filtering techniques like Butterworth, filtered PPG signals are cleaner and more suitable for accurate analysis Fig. \ref{fig:rawfilter}, ensuring better detection of cardiovascular parameters like blood pressure and heart rate.
+\begin{figure}[h]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/Slide5.PNG}
+%\captionsetup{justification=centering}
+\caption{Raw and Filtered PPG Signal: Noise Reduction Comparison}
+\label{fig:rawfilter}
+\end{figure}
+\subsection{Model Architecture}
+\linebreak
+\begin{figure}[htbp]
+\centering
+%\includegraphics[width=18cm,height=9cm]{}
+\includegraphics[width=0.5\textwidth]{SmartBP/images ppt [Autosaved]-6.pdf}
+\caption{Proposed Mixed Attention Gated U-Net model architecture}
+\label{fig:MAGU}
+\end{figure}
+The Mixed Attention Gated U-Net (MAGU) model architecture Fig. \ref{fig:MAGU}, designed for enhancing feature extraction and prediction accuracy in our SmartBP project , consists of various layers strategically organized to optimize performance. This architecture comprises three Conv1D layers for initial feature extraction, followed by two MaxPooling1D layers for down-sampling and feature reduction. A Dropout layer is incorporated to prevent overfitting. Furthermore, three ResidualBlocks are used to capture and preserve vital contextual information within the network. The MAGU architecture introduces a novel element, the MixedAttentionBlock \cite{b14}, which enhances feature selection by considering both channel and spatial domains. Additionally, the MixedGatedAttentionBlock adds a dynamic attention mechanism, improving the decoder's ability to recover essential signal features. The decoder, which is made up of Conv1D layers, improves feature representation by combining low-dimensional and high-dimensional characteristics via the usage of Mixed Attention modules. The model processes the data using two Global Average Pooling 1D layers before producing estimates of the SBP and DBP. 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Results And Discussion} \label{result} 
+We assess our MAGU model's performance in this area. Using the TensorFlow 2.0.0 framework and Keras in a Python 3.7 environment, we built and trained this model. The model is around 40 MB in size and then reduced to 14 MB using Tensorflowlite(TFlite), and each training epoch takes an average of about 250 seconds to complete. These computations were conducted on a system featuring an Intel i9 CPU with a clock speed of 3.70GHz and an RTX2070 graphics card. Additionally, within this section, we present the results of real-time testing to provide a comprehensive assessment of the model's performance.
+\subsection{Performance and Error analysis of MAGU}
+The model's performance notably improved during training. Initially, at epoch 1, the test loss is high at 1200, indicating early learning. By epoch 10, the test loss decreases to 500, signifying progress. 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.9\linewidth]{SmartBP/trainvsvalidation.pdf}
+%\captionsetup{justification=centering}
+\caption{Model Performance Progression Over Epochs.}
+\label{epoch}
+\end{figure}Subsequently, both test and validation losses steadily decline, reaching loss 200 at epoch 50 Fig. \ref{epoch}. These results indicate effective learning of underlying data patterns through decreasing loss values. However, it's essential to monitor further training as it may enhance performance or risk overfitting, necessitating careful optimization for better generalization. The graph in Fig. \ref{true} demonstrates the model's strong predictive performance, with the majority of data points closely aligning with the true values. Only a few data points show minor deviations, indicating overall accurate blood pressure predictions. The dataset exhibits numerous outliers, with several values indicating elevated SBP exceeding 140 mmHg and DBP below 60 mmHg. These findings suggest a prevalence of hypertension among a significant portion of the population within the dataset. 
+\begin{figure}[ht]
+
+\includegraphics[width=1\linewidth]{SmartBP/truevspredicted.pdf}
+\captionsetup{justification=centering}
+\caption{Comparison of True and Predicted Blood Pressure Values. (a) True SBP and Predicted SBP. (b) True DBP and Predicted DBP. }
+\label{true}
+\end{figure}
+
+\begin{table}[h!]
+\caption{Comparison of different models based on MAE and computational efficiency}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{| p{2.5cm} | p{1.1cm} | p{1.1cm} | p{1.5cm} |}
+\hline
+\textbf{Paper} & \textbf{MAE (SBP)} & \textbf{MAE (DBP)} & \textbf{Model Size (MB)} \\ 
+\hline
+[1] Alexnet, Slapnicar, resnet & 12.51 & 8.3 & NA \\ 
+\hline
+[2] LSTM & 6.72 & 2.51 & NA \\ 
+\hline
+[3] CNN, Alexnet & 5.95 & 3.41 & NA \\ 
+\hline
+[10] Supervised U-Net model & 9.16 & 6.14 & NA\\ 
+\hline
+[11] GAN, LR & 8.5 & 5.8 & 47.4 \\ 
+\hline
+[12] U-Net & 7.15 & 2.77 & NA\\ 
+\hline
+\textbf{This work: Mixed Attention Gated U-Net} & 2.96 & 1.9 & 14 \\ 
+\hline
+\end{tabular}
+\label{tab:comparison}
+\end{table}
+\subsection{Evaluating Model Performance Against BHS Criteria}
+The British Hypertension Society (BHS) divides blood pressure measurement devices into four grades (A, B, C, and D) based on their accuracy. Grade A indicates the most accurate devices that adhere to strict error margins. Grade B allows for slightly larger errors, while Grade C is less accurate, and Grade D represents the lowest acceptable accuracy.
+The BHS standard formula calculates the percentage of measurements with errors within specified limits. In equation(\ref{bhsequ}) percentage of data with error less than or equal to 5mmHg is calculated.
+
+\begin{equation}
+N_{5 \text{mmHg}} = \left( \frac{\text{No, of predictions with error} \leq 5 \text{ mmHg}}{\text{Total number of predictions}} \right) \times 100
+\label{bhsequ}
+\end{equation}
+
+\begin{table}[h]
+\centering
+\caption{BHS Criteria for Blood Pressure Measurement Accuracy}
+\begin{tabular}{|c|p{1.7cm}|p{1.7cm}|p{1.7cm}|}
+\hline
+\textbf{Grade} & \textbf{Difference $\leq 5 mmHg$ } & \textbf{Difference $\leq10 mmHg$ } & \textbf{Difference $\leq15 mmHg$ } \\ \hline
+A & 60 \% & 85 \%& 95 \% \\ \hline
+B & 50 \%& 75 \% & 90 \%\\ \hline
+C & 40 \%& 65 \% & 85 \% \\ \hline
+D & Below C & Below C & Below C \\ \hline
+\end{tabular}
+\label{tab:bhs_criteria}
+\end{table}
+\begin{table}[h]
+\centering
+\caption{Evaluation of Model Performance Against BHS Grade B Criteria}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Metric (Grade B)} & \textbf{$\leq$ 5 mmHg } & \textbf{$\leq$ 10 mmHg } & \textbf{$\leq$ 15 mmHg } \\ \hline
+SBP & 72 \% & 82 \% & 92 \% \\ \hline
+DBP & 88 \% & 91 \%& 96 \%\\ \hline
+\end{tabular}
+\label{tab:grade_b_results}
+\end{table}
+
+
+MAE is a crucial evaluation metric for BP predictions. It calculates the mean absolute difference between the actual and expected blood pressure readings \ref{eq:MAE}. MAE makes sure that forecast accuracy is easily understood.
+\begin{equation}
+    \text{MAE} = \frac{\sum \vert \text{BP}_{\text{actual}} - \text{BP}_{\text{predicted}} \vert}{n},
+    \label{eq:MAE}
+\end{equation}
+
+The histogram illustrates that a significant number of predicted SBP and DBP values exhibit minimal absolute error (MAE = 0), indicating precise predictions. However, both SBP and DBP distributions reveal wrong predictions in Fig. \ref{hist}, representing instances where predictions slightly deviate from true values. 
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/maeerror.pdf}
+\captionsetup{justification=centering}
+\caption{SBP and DBP Prediction Error Distribution. (a) SBP error against frequency histogram. (b) DBP error against frequency histogram }
+\label{hist}
+\end{figure}
+The Bland-Altman plot assesses the model's accuracy in measuring systolic (SBP) and diastolic (DBP) blood pressure. The x-axis displays the mean of true and predicted values, while the y-axis represents the difference between them. A narrower spread around zero indicates better agreement. This plot visually validates the model's performance by highlighting any systematic bias or outliers.
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/blandaltman.pdf}
+\captionsetup{justification=centering}
+\caption{Bland-Altman Plot of predicted and true (a) SBP. (b) DBP.}
+\label{hist}
+\end{figure}
+\subsection{Real-Time Model Evaluation}
+
+ We conducted initial model testing by collecting fingertip videos from 13 individual's left hand. These data were gathered in a controlled environment with a temperature below 25 degrees Celsius and normal lighting conditions \cite{b20}, as these factors can affect the accuracy of PPG signal extraction. We utilized both iPhone 12 and Realme 5i smartphone to capture the videos simultaneously. Furthermore, we measured the blood pressure  of each participant using an automatic wrist blood pressure monitor, ensuring that we had corresponding BP values for our PPG data for robust model evaluation. The measurements are plotted in Fig. \ref{prediction}. The PPG signal quality can be influenced by various factors, including finger size, video stability, lighting conditions, and the choice of smartphone. Larger fingers may lead to variations in signal acquisition. Stable video capture is crucial for accurate PPG extraction. Lighting conditions impact signal visibility. Additionally, the smartphone used can affect video quality, potentially impacting PPG signal extraction and, consequently, blood pressure prediction. Consideration of these factors is essential for reliable real-time blood pressure monitoring.
+ \begin{figure}[ht]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/phonepredictions.pdf}
+%\captionsetup{justification=centering}
+\caption{Comparison of True and Predicted SBP and DBP of SmartBP Application on (a) iphone 12 (b) Realme 5i}
+\label{prediction}
+\end{figure}
+\begin{figure}[ht]
+\centering
+\includegraphics[width=1\linewidth]{SmartBP/app.pdf}
+\captionsetup{justification=centering}
+\caption{User interface of SmartBP. (a) Button to start video recording. (b) Placing the camera on fingertip. (c) SBP and DBP prediction}
+\label{deployment}
+\end{figure}
+ \begin{table}[h]
+    \centering
+    \caption{Blood Pressure Measurement MAE on Different Phones with Respective Cameras using SmartBP}
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline
+        \textbf{Phone} & \textbf{Camera}  & \textbf{Price (USD)} & \textbf{MAE: SBP} & \textbf{MAE: DBP} \\
+        \hline
+        iPhone 12 & 12 MP& 272 & 3.83 & 3.02 \\
+        \hline
+        VIVO Y21 & 12 MP & 170 & 4.03 & 3.17 \\
+        \hline
+        Realme 5i & 8 MP & 125 & 4.66 & 3.46 \\
+        \hline
+    \end{tabular}
+\end{table}
+\subsection{Smartphone Application Deployment}
+The SmartBP model was converted into a mobile-compatible format through a series of steps, including freezing, compressing, and optimizing using TensorFlow Lite. The final model size was reduced from 40MB to 14MB. We detailed the resource utilization, noting that the application requires approximately 512MB of RAM and occupies 176MB of ROM. The application was tested on a range of devices, including iPhone12, VIVO Y21, Realme 5i demonstrating consistent performance across different hardware configurations.The application, depicted in Fig. \ref{deployment}, streamlines the process for convenient blood pressure monitoring. The user interface was designed with simplicity in mind, ensuring an intuitive experience for users with minimal technical skills. Extensive field testing was conducted, involving 35 participants in various real-world conditions, validating the application's practicality and user-friendliness.
+ 
+\section{Conclusion and Future Works}\label{conclusion}
+In order to estimate blood pressure, this paper presents a robust and computationally effective mixed-attention gated U-Net model. The model achieves remarkable accuracy after training over 50 epochs, producing an MAE of 2.96 mmHg for SBP and 1.9 mmHg for DBP. Remarkably, this high-performance model maintains a compact size of just 14 MB, making it ideal for resource-constrained devices. Leveraging a Butterworth band-pass filter for precise PPG signal extraction, our system offers accurate blood pressure predictions. Looking ahead, our immediate focus lies in deploying this model into a user-friendly smartphone application, enabling real-time blood pressure measurements and enhancing user accessibility. Additionally, to address the intricate influence of demographic attributes on blood pressure estimation, our future research will incorporate factors such as age, gender, height, weight, and more. By diligently addressing these research areas, we aim to refine and broaden the capabilities of our smartphone-based blood pressure measurement system, fostering improved healthcare accessibility and precision across diverse user populations in real-world scenarios.
+
+
+
+% references section
+\bibliographystyle{IEEEtran}
+\bibliography{Jaundice_Bib}
+
+\end{document}

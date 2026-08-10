@@ -1,0 +1,268 @@
+\documentclass[journal,twoside,web]{ieeecolor}
+\usepackage{jsen}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{xcolor}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+\begin{document}
+
+\title{BeatGraphBP: Beat-Aware Graph Attention and U-Net Fusion for Cuffless Blood Pressure Estimation}
+
+\author{
+Abhinay Bhandekar, Thakur Jaideep Singh, and Debanjan Das, \IEEEmembership{Senior Member, IEEE}
+\thanks{Abhinay Bhandekar is with the Department of Computer Science and Engineering, IIIT Naya Raipur, India (e-mail: bhandekar22100@iiitnr.edu.in).}
+\thanks{Thakur Jaideep Singh is with the Department of Data Science and Artificial Intelligence, IIIT Naya Raipur, India (e-mail: thakur22102@iiitnr.edu.in).}
+\thanks{Debanjan Das is with the Centre of Excellence in Affordable Healthcare, IIT Kharagpur, India (e-mail: debanjan@ieee.org).}
+}
+
+\IEEEtitleabstractindextext{
+\begin{abstract}
+Cuffless blood pressure estimation is difficult because the relation between a peripheral photoplethysmogram (PPG) and arterial pressure changes across people and over time. This paper presents BeatGraphBP, a one-dimensional model that combines a U-Net signal encoder with a graph of cardiac beats. The model uses electrocardiogram (ECG), PPG, and the first two PPG derivatives as window-level inputs. R peaks divide each window into beats. Every beat is encoded as a node, and edges connect neighboring beats and beats with similar morphology. Two graph-attention layers pass information between these nodes. The graph representation is then fused with U-Net features, demographic variables, and a residual regression head to estimate systolic and diastolic blood pressure (SBP and DBP). An auxiliary decoder reconstructs the arterial blood pressure waveform during training. The implementation was evaluated on VitalDB-derived PulseDB subsets. On a 20,000-window internal validation set, BeatGraphBP obtained SBP and DBP mean absolute errors (MAEs) of 6.00 and 3.16~mmHg. On a 51,720-window calibration-based test set containing the same subject cohort, the MAEs were 7.12 and 3.92~mmHg. On a calibration-free set of unseen subjects, they increased to 12.51 and 8.14~mmHg. These results show that the beat graph is useful, but they also show a clear subject-generalization gap. The method should therefore be viewed as a research model, not as a clinically validated blood pressure device.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Blood pressure estimation, photoplethysmography, electrocardiography, graph attention, U-Net, PulseDB, cuffless monitoring.
+\end{IEEEkeywords}}
+
+\maketitle
+
+\section{Introduction}\label{sec:introduction}
+
+Blood pressure (BP) is commonly measured with an inflatable cuff. A cuff gives only occasional readings and may be uncomfortable when measurements are repeated often. This has led to strong interest in cuffless methods based on signals that can be collected continuously, especially the electrocardiogram (ECG) and photoplethysmogram (PPG). PPG measures changes in peripheral blood volume, while ECG gives a clear timing reference for the electrical activity of the heart. Both signals are easy to obtain in clinical monitors and wearable devices, but neither provides BP directly.
+
+Learning BP from these signals remains hard for three reasons. First, PPG shape is affected by vascular tone, sensor contact, measurement site, and subject characteristics. Second, useful information exists at two scales: the shape of each beat and the pattern across several beats. Third, a model can perform well when windows from the same person appear in training and testing, yet fail on a new person. PulseDB was created in part to support consistent calibration-based and calibration-free evaluation of this problem \cite{wang2023pulsedb}.
+
+Most deep models process a signal window as a regular sequence. This is useful for local waveform features, but it does not explicitly represent the relations among beats. A beat sequence also has a natural graph structure. Consecutive beats are linked in time, and non-consecutive beats may still be related when their shapes are similar. This motivates a model that uses both a dense temporal path and a beat-level graph path.
+
+We propose BeatGraphBP, a graph-enhanced one-dimensional U-Net for SBP and DBP estimation. The implementation makes the following contributions:
+
+\begin{itemize}
+    \item It represents each detected cardiac beat as a graph node. The graph contains self-links, temporal links between consecutive beats, and morphology links based on cosine similarity.
+    \item It combines three types of information: full-window ECG/PPG features, graph-attended beat features, and five demographic variables.
+    \item It uses two related training targets. A scalar head estimates SBP and DBP, while an auxiliary decoder estimates the arterial BP (ABP) waveform.
+    \item It reports both window-level and subject-level results on internal, calibration-based, and calibration-free subsets. The last setting makes the generalization limit of the model visible.
+\end{itemize}
+
+The scope of this paper follows the codebase. It studies BP estimation from synchronized clinical ECG and PPG signals. It does not implement video capture, smartphone PPG extraction, model quantization, or a mobile application. Claims about those functions are therefore outside the present work.
+
+\section{Related Work}\label{sec:related}
+
+\subsection{Deep learning for cuffless BP estimation}
+
+Earlier cuffless systems often used manually selected timing and morphological features. Such features can be meaningful, but their extraction depends on reliable landmark detection. End-to-end models reduce this dependence by learning directly from signal samples. A common design is to estimate an ABP waveform and obtain pressure values from that waveform. Athaya and Choi used a U-Net to map PPG to ABP \cite{athaya2021unet}. BP-Net similarly used an intermediate ABP estimate while predicting SBP, mean arterial pressure, and DBP \cite{esmaelpoor2022bpnet}. A Squeeze U-Net showed that a compact one-dimensional encoder--decoder can estimate BP from raw PPG and can be designed with mobile computation in mind \cite{mou2022squeeze}.
+
+These studies support the use of an encoder--decoder, but the present model differs in two ways. It estimates scalar BP from fused global features rather than extracting the final values only from a reconstructed waveform. It also creates an explicit graph over detected beats.
+
+\subsection{Attention and graph models}
+
+Channel attention can improve a convolutional model by reweighting feature channels. Squeeze-and-excitation (SE) blocks provide a simple way to learn these weights \cite{hu2018senet}. Attention gates can also filter skip features before they enter a decoder \cite{oktay2018attention}. Both ideas are used in BeatGraphBP.
+
+Graph attention networks assign different weights to neighboring nodes during message passing \cite{velickovic2018gat}. In cuffless BP research, CiGNN used a causal graph over wearable features and temporal graph learning for continuous BP estimation \cite{jin2024cignn}. BeatGraphBP uses a different graph definition: a node is one cardiac beat, and its edges come directly from time order and learned beat embeddings. The purpose is to keep beat structure visible while still using a convolutional path for the full signal.
+
+\section{Materials and Methods}\label{sec:methods}
+
+\subsection{Dataset and experimental subsets}
+
+The experiments use the VitalDB portion of PulseDB. VitalDB is a high-fidelity database of intraoperative vital signs \cite{lee2022vitaldb}. PulseDB provides synchronized ECG, fingertip PPG, ABP, subject identifiers, and demographic information at 125~Hz \cite{wang2023pulsedb}. The local training file contains 465,480 windows from 1,293 subjects. Every stored window has 1,250 samples; the implementation reads the first 1,248 samples, equal to 9.984~s.
+
+Table~\ref{tab:data} lists the subsets used in this work. The final training run used 372,384 randomly selected records. The reserved validation partition contained 93,096 records, from which 20,000 were used during checkpoint selection. This is a record-level split, so the same subjects can occur in training and validation. The calibration-based test set also contains the 1,293-subject cohort, with 40 windows per subject. The calibration-free test set contains different subjects. The AAMI subset is small and has a different pressure distribution; it is included as a stress test rather than as proof of compliance with a device-validation standard.
+
+\begin{table}[!t]
+\caption{Data subsets used in the experiments.}
+\label{tab:data}
+\centering
+\begin{tabular}{lrrl}
+\toprule
+Subset & Windows & Subjects & Role \\
+\midrule
+Training & 372,384 & 1,293 & Model fitting \\
+Internal validation & 20,000 & 1,293 & Checkpoint selection \\
+Calibration-based test & 51,720 & 1,293 & Seen-subject cohort \\
+Calibration-free test & 57,600 & 144 & Unseen subjects \\
+AAMI test & 666 & 116 & Distribution stress test \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Window and beat preparation}
+
+The main input mode contains four channels:
+\begin{equation}
+\mathbf{X}=[\mathrm{ECG},\mathrm{PPG},\dot{\mathrm{PPG}},\ddot{\mathrm{PPG}}]\in\mathbb{R}^{4\times1248}.
+\label{eq:input}
+\end{equation}
+The derivatives are numerical gradients multiplied by the 125-Hz sampling rate. Each channel is standardized with the mean and standard deviation computed from the training records. A second input mode in the code removes ECG from the window and uses PPG and its two derivatives, but the reported checkpoint uses the four-channel mode.
+
+ECG is band-pass filtered from 0.5 to 30~Hz only for R-peak detection. Peaks are restricted to the range of 40--180 beats per minute. If $r_i$ and $r_{i+1}$ are two consecutive R peaks, a beat begins $0.25(r_{i+1}-r_i)$ samples before $r_i$ and ends $0.05(r_{i+1}-r_i)$ samples before $r_{i+1}$. Every accepted beat is linearly resized to 128 samples.
+
+Four explicit features are stored for beat $i$: the RR interval, the change from the previous RR interval, normalized heart rate, and an approximate pulse transit time (PTT). PTT is the delay from the R peak to the minimum PPG sample in the following 0.3~s. These simple features are projected to the same dimension as the learned beat embedding. Missing demographic values are replaced by training-set means. Age, sex, height, weight, and body mass index are then standardized.
+
+\subsection{Beat graph construction}
+
+For each beat, a small convolutional encoder maps the selected beat channels to a 64-dimensional vector $\mathbf{h}_i$. In the reported ECG--PPG mode, this beat encoder receives ECG and PPG; the derivatives remain available to the window-level U-Net. The projected RR/PTT feature vector is added to $\mathbf{h}_i$.
+
+The adjacency matrix $\mathbf{A}$ is defined by
+\begin{equation}
+A_{ij}=1 \quad \text{if}\quad i=j,\; |i-j|=1,\;\text{or}\;
+\frac{\mathbf{h}_i^\top\mathbf{h}_j}{\|\mathbf{h}_i\|_2\|\mathbf{h}_j\|_2}>\tau,
+\label{eq:adjacency}
+\end{equation}
+where $\tau$ is a stored morphology threshold. Padding nodes are masked. Thus, the graph always keeps self and temporal links, while morphology links can join non-adjacent beats with similar embeddings.
+
+Two four-head graph-attention layers update the beat vectors. For one attention head,
+\begin{equation}
+\alpha_{ij}=\mathop{\mathrm{softmax}}_{j:A_{ij}=1}
+\left(\frac{(\mathbf{W}_q\mathbf{h}_i)^\top(\mathbf{W}_k\mathbf{h}_j)}{\sqrt{d_h}}\right),
+\end{equation}
+\begin{equation}
+\widetilde{\mathbf{h}}_i=\sum_{j:A_{ij}=1}\alpha_{ij}\mathbf{W}_v\mathbf{h}_j.
+\end{equation}
+The layer uses a residual connection, layer normalization, dropout, and an ELU activation. An attention pool combines the final beat tokens into one graph vector. In parallel, each token is copied back to the sample positions covered by its beat. This produces a time-aligned graph context for the U-Net decoder.
+
+\subsection{Graph-enhanced U-Net}
+
+The U-Net encoder has four convolutional blocks with 32, 64, 128, and 256 channels. Each block contains two one-dimensional convolutions, group normalization, ReLU activation, dropout after the first convolution, and an SE block. Max pooling reduces the temporal length between blocks.
+
+At the bottleneck, the time-aligned graph context is average-pooled to the bottleneck length, concatenated with the 256-channel convolutional feature map, and fused by a $1\times1$ convolution. The decoder uses three transposed convolutions. Before every encoder skip is concatenated with the decoder, an attention gate suppresses less useful skip features.
+
+The final BP vector uses four sources:
+\begin{equation}
+\mathbf{z}=[\mathrm{mean}(\mathbf{E}),\mathrm{mean}(\mathbf{D}),
+\mathrm{max}(\mathbf{D}),\mathbf{g},\mathbf{d}],
+\end{equation}
+where $\mathbf{E}$ is the bottleneck, $\mathbf{D}$ is the final decoder map, $\mathbf{g}$ is the pooled graph vector, and $\mathbf{d}$ is the 32-dimensional demographic embedding. A residual multilayer perceptron maps $\mathbf{z}$ to normalized SBP and DBP. A separate $1\times1$ convolution maps $\mathbf{D}$ to a 1,248-sample ABP waveform. The complete model has 1,371,748 trainable parameters, equal to about 5.49~MB of 32-bit weights.
+
+\subsection{Training}
+
+The scalar targets are standardized using the training-set mean and standard deviation. The ABP waveform is normalized with fixed values of 80~mmHg and 60~mmHg. Training minimizes
+\begin{equation}
+\mathcal{L}=\lambda_s\|\widehat{\mathbf{y}}-\mathbf{y}\|_1+
+\lambda_w\|\widehat{\mathbf{a}}-\mathbf{a}\|_1,
+\label{eq:loss}
+\end{equation}
+where $\mathbf{y}$ contains SBP and DBP and $\mathbf{a}$ is the ABP waveform. Both weights are 1 in the reported run.
+
+The model was trained for 300 epochs with Adam, a batch size of 256, an initial learning rate of $5\times10^{-5}$, weight decay of $10^{-4}$, gradient clipping at 0.5, and cosine warm restarts every 50 epochs. Mixed-precision training was enabled on the GPU. Sampling weights were estimated from the ratio between smoothed SBP densities in the training set and the AAMI calibration subset. The ratio was clipped at 10 and normalized to mean one. The best checkpoint was chosen by the average window-level SBP/DBP MAE and occurred at epoch 295.
+
+\subsection{Evaluation}
+
+For $N$ windows, MAE is
+\begin{equation}
+\mathrm{MAE}=\frac{1}{N}\sum_{i=1}^{N}|\widehat{y}_i-y_i|.
+\end{equation}
+We also report mean error (ME) and the standard deviation (SD) of signed errors. Subject-level predictions and targets are the median values across all evaluated windows of each subject.
+
+The implementation labels a result as passing its numerical ``AAMI'' check when $|\mathrm{ME}|\leq5$~mmHg and error SD $\leq8$~mmHg for both SBP and DBP. These limits are related to the AAMI/ESH/ISO accuracy criterion \cite{stergiou2018universal}, but the Boolean check in the code is not a complete clinical validation protocol. It does not by itself establish compliance for a medical device.
+
+\section{Results}\label{sec:results}
+
+\subsection{Internal validation}
+
+Table~\ref{tab:mainresults} gives the results reproduced with the final checkpoint and evaluator. On internal validation, the window-level MAE was 6.00~mmHg for SBP and 3.16~mmHg for DBP. Median aggregation reduced these errors to 4.09 and 1.70~mmHg at subject level. The signed-error SDs were 7.56 and 4.64~mmHg, so the internal result met the code's numerical threshold.
+
+\begin{table*}[!t]
+\caption{Performance of the final BeatGraphBP checkpoint. MAE, ME, and SD are in mmHg. ``Pass'' refers only to the numerical check implemented in the code.}
+\label{tab:mainresults}
+\centering
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{llrrrrrrc}
+\toprule
+Subset & Level & SBP MAE & SBP ME & SBP SD & DBP MAE & DBP ME & DBP SD & Pass \\
+\midrule
+Internal validation & Window  & 6.00 & 3.19 & 7.56 & 3.16 & -0.78 & 4.64 & Yes \\
+                    & Subject & 4.09 & 3.28 & 3.92 & 1.70 & -0.74 & 2.21 & Yes \\
+\midrule
+Calibration-based  & Window  & 7.12 & 4.26 & 8.26 & 3.92 & -1.85 & 5.24 & No \\
+                    & Subject & 5.05 & 4.42 & 3.89 & 2.68 & -1.78 & 2.86 & Yes \\
+\midrule
+Calibration-free   & Window  & 12.51 & 3.60 & 15.52 & 8.14 & -2.78 & 9.95 & No \\
+                    & Subject & 10.57 & 3.79 & 12.69 & 7.04 & -2.92 & 8.30 & No \\
+\midrule
+AAMI stress test   & Window  & 15.62 & -4.67 & 20.24 & 11.68 & -7.97 & 12.34 & No \\
+                    & Subject & 16.01 & -6.61 & 20.63 & 12.25 & -8.63 & 12.66 & No \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Calibration-based and calibration-free tests}
+
+On the calibration-based subset, window MAE rose to 7.12~mmHg for SBP and 3.92~mmHg for DBP. Subject medians were more stable and met the numerical threshold. This result is useful for repeated monitoring within a known cohort, but it is not an independent-subject test.
+
+The calibration-free result was substantially weaker. SBP MAE increased to 12.51~mmHg and DBP MAE to 8.14~mmHg. Subject aggregation did not close the gap. The AAMI stress subset was harder still. Its errors were 15.62 and 11.68~mmHg at window level. No subject-specific bias correction was used for the values in Table~\ref{tab:mainresults}.
+
+\subsection{Graph-branch analysis}
+
+The diagnostic code measures graph density and performs inference-time branch removal. On the calibration-based subset, the average graph density was about 0.86, meaning that the graph retained many links in addition to the required self and temporal links. The density had negative correlation with beat-to-beat variation in DBP ($r=-0.379$), pulse pressure ($r=-0.399$), and mean pressure ($r=-0.652$). In this dataset, denser morphology graphs therefore tended to occur in more stable windows. This is an association, not evidence of causality.
+
+The original saved diagnostic is summarized in Table~\ref{tab:ablation}. Removing only the time-aligned graph context caused a small MAE increase. Removing the pooled graph vector caused a much larger increase. This suggests that the global graph summary is the main path by which the graph branch affects the scalar estimate. Because these are inference-time removals from one trained model, they do not replace a fully retrained ablation study.
+
+\begin{table}[!t]
+\caption{Inference-time graph removal on the 51,720-window calibration-based subset.}
+\label{tab:ablation}
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Variant & SBP MAE & DBP MAE & Mean MAE \\
+\midrule
+Full model & 7.12 & 3.92 & 5.52 \\
+No graph context & 7.41 & 3.90 & 5.65 \\
+No graph pool & 13.94 & 7.88 & 10.91 \\
+No graph branch & 14.04 & 7.90 & 10.97 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Discussion}\label{sec:discussion}
+
+The internal results show that the architecture can learn a useful relation between synchronized ECG, PPG, demographics, and BP. The beat graph also has a measurable role. In particular, the graph pool gives the regression head a compact view of beat consistency across the complete window. The U-Net path keeps local waveform detail, and auxiliary ABP reconstruction encourages the decoder to preserve pressure-related temporal structure.
+
+The strongest finding, however, is the gap between seen and unseen subjects. Record-level validation gives an optimistic view because windows from one person can appear on both sides of the split. The calibration-based subset remains close to that setting. The calibration-free subset is more demanding and reveals that the model still learns subject-specific relations. This pattern agrees with the motivation behind the separate PulseDB protocols \cite{wang2023pulsedb}.
+
+Several implementation details also limit interpretation. The scalar SBP and DBP labels are read directly from the prepared dataset. Although the code contains signal-quality and physiological-range functions, the native-window dataset path does not call them when constructing the reported cache. The morphology threshold is applied through a hard comparison. This makes graph topology easy to interpret, but it prevents a smooth gradient through edge creation in the present implementation. Finally, the approximate PTT uses the minimum PPG value after each R peak. A more robust foot detector may be less sensitive to waveform inversion and noise.
+
+The work should not be described as a smartphone system. The input contains ECG and PPG from synchronized clinical recordings, and ECG is used for both beat boundaries and timing features. A PPG-only mode exists, but the results in this paper do not evaluate it. There is also no code for camera video processing, mobile deployment, or prospective comparison with a cuff. Clinical use would require independent data collection, a locked preprocessing pipeline, device-specific validation, and the complete AAMI/ESH/ISO procedure.
+
+\section{Conclusion}\label{sec:conclusion}
+
+This paper presented BeatGraphBP, a beat-aware graph-attention U-Net for cuffless BP estimation. The model joins a full-window convolutional path with an explicit graph of cardiac beats and includes demographic information and auxiliary ABP reconstruction. It achieved low internal and calibration-based errors, and graph-branch removal showed that the pooled beat representation carries important information. At the same time, performance declined on unseen subjects and on the AAMI stress subset. The next work should therefore focus on subject-disjoint training and model selection, robust beat and PPG-foot detection, retrained component ablations, and external prospective validation. These steps are more important than deployment claims at the current stage.
+
+\begin{thebibliography}{99}
+
+\bibitem{wang2023pulsedb}
+W. Wang, P. Mohseni, K. L. Kilgore, and L. Najafizadeh, ``PulseDB: A large, cleaned dataset based on MIMIC-III and VitalDB for benchmarking cuff-less blood pressure estimation methods,'' \emph{Frontiers in Digital Health}, vol. 4, Art. no. 1090854, 2023.
+
+\bibitem{lee2022vitaldb}
+H.-C. Lee, Y. Park, S.-B. Yoon, S.-M. Yang, D. Park, and C.-W. Jung, ``VitalDB, a high-fidelity multi-parameter vital signs database in surgical patients,'' \emph{Scientific Data}, vol. 9, Art. no. 279, 2022.
+
+\bibitem{athaya2021unet}
+T. Athaya and S. Choi, ``An estimation method of continuous non-invasive arterial blood pressure waveform using photoplethysmography: A U-Net architecture-based approach,'' \emph{Sensors}, vol. 21, no. 5, Art. no. 1867, 2021.
+
+\bibitem{esmaelpoor2022bpnet}
+R. V. K, S. Vedanth, G. Poojah, K. Abhishek, M. Nitish Kumar, and V. Vijayaraghavan, ``BP-Net: Efficient deep learning for continuous arterial blood pressure estimation using photoplethysmogram,'' arXiv:2111.14558, 2021.
+
+\bibitem{mou2022squeeze}
+T. Athaya and S. Choi, ``Real-time cuffless continuous blood pressure estimation using 1D Squeeze U-Net model: A progress toward mHealth,'' \emph{Biosensors}, vol. 12, no. 8, Art. no. 655, 2022.
+
+\bibitem{hu2018senet}
+J. Hu, L. Shen, and G. Sun, ``Squeeze-and-excitation networks,'' in \emph{Proc. IEEE Conf. Computer Vision and Pattern Recognition}, 2018, pp. 7132--7141.
+
+\bibitem{oktay2018attention}
+O. Oktay \emph{et al.}, ``Attention U-Net: Learning where to look for the pancreas,'' in \emph{Proc. Medical Imaging with Deep Learning}, 2018.
+
+\bibitem{velickovic2018gat}
+P. Veli\v{c}kovi\'c, G. Cucurull, A. Casanova, A. Romero, P. Li\`o, and Y. Bengio, ``Graph attention networks,'' in \emph{Proc. International Conference on Learning Representations}, 2018.
+
+\bibitem{jin2024cignn}
+L. Liu, H. Lu, M. Whelan, Y. Chen, and X. Ding, ``CiGNN: A causality-informed and graph neural network based framework for cuffless continuous blood pressure estimation,'' \emph{IEEE Journal of Biomedical and Health Informatics}, vol. 28, no. 5, pp. 2674--2686, 2024.
+
+\bibitem{stergiou2018universal}
+G. S. Stergiou \emph{et al.}, ``A universal standard for the validation of blood pressure measuring devices: Association for the Advancement of Medical Instrumentation/European Society of Hypertension/International Organization for Standardization (AAMI/ESH/ISO) collaboration statement,'' \emph{Hypertension}, vol. 71, no. 3, pp. 368--374, 2018.
+
+\end{thebibliography}
+
+\end{document}
