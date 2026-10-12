@@ -132,11 +132,6 @@ python -m beatgraph.evaluate \
     --output results/eval/calfree.npz
 ```
 
-Calibration options:
-
-- **`--calibration-samples K` on its own:** the first K windows of each test subject are used to estimate a per-subject bias. That bias is subtracted from the subject's other windows, and the K calibration windows are excluded from the metrics.
-- **`--aami-cal-file FILE --calibration-samples K`:** the per-subject bias is estimated from the first K windows of the matching subject in FILE. Subjects missing from FILE get the mean bias of the matched subjects. K must be at least 1; with K = 0 the predictions come out as NaN.
-
 Reported metrics are MAE, mean error (ME), and SD of the signed error for SBP and DBP, at two levels:
 - **Window level:** per window.
 - **Subject level:** median prediction vs median target across each subject's windows.
